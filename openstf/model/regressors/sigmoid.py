@@ -111,7 +111,6 @@ class TanhOpenstfRegressor(OpenstfRegressor):
 
         X, y = self._validate_data(X, y, y_numeric=True)
         init_params = self._check_init_params(init_params, X)
-        n_feat = X.shape[1]
 
         # Fitting
         p0 = init_params

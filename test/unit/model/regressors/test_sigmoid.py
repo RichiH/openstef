@@ -15,6 +15,8 @@ train_input = TestData.load("reference_sets/307-train-data.csv")
 
 
 class TestPREOLEOpenstfRegressor(BaseTestCase):
+    # Test the the mother class because PREOLE perform positivity check on the inputs and the targets
+    # These positivity constraints break the check_estimator
     def test_sklearn_compliant(self):
         # Use sklearn build in check, this will raise an exception if some check fails
         # During these tests the fit and predict methods are elaborately tested

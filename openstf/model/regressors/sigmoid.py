@@ -24,11 +24,27 @@ class TanhOpenstfRegressor(OpenstfRegressor):
         Scaling factor to map the prediction from [0, 1] to the original [0, scale].
 
     max_iter: int, default=5
-        Number of iteration for the robusness mechanism.
+        The maximum number of iterations for the robusness mechanism.
 
     Attributes
     ----------
+    init_params_: ndarray of shape (n_feature + 1,)
+        Initial parameters for the first iteration of least squared optimization
 
+    n_iter_: int
+        The actual number of iterations performed.
+
+    intercept_: float
+        Constant in tanh function.
+
+    coef_: ndarray of shape (n_feature,)
+        Weights assigned to the features.
+
+    params_: ndarray of shape (n_feature + 1,)
+        The concatenation of the intercept and the coefficients.
+
+    feature_importance_: ndarray of shape (n_feature,)
+        The absolute values of the coefficients.
     """
 
     gain_importance_name = "total_gain"
@@ -109,14 +125,16 @@ class TanhOpenstfRegressor(OpenstfRegressor):
 
     def fit(self, X, y, init_params=None, bounds=(-np.inf, np.inf), **kwargs):
 
+        # Check data
         X, y = self._validate_data(X, y, y_numeric=True)
         init_params = self._check_init_params(init_params, X)
 
-        # Fitting
+        # Initialization
         p0 = init_params
         popt = p0 + 0.1
         indexes = np.arange(len(X))
 
+        # Iterative fitting for robustness
         for i in range(self.max_iter):
             Xi = X[indexes]
             yi = y[indexes]
@@ -135,6 +153,7 @@ class TanhOpenstfRegressor(OpenstfRegressor):
                 break
             p0 = popt
 
+            # Filter-out outliers
             yhat = self._scaled_tanh(X, self.scale, popt)
             residual = yhat - y
             threshold = np.median(np.abs(residual - np.median(residual)))
@@ -162,11 +181,11 @@ class PREOLEOpenstfRegressor(TanhOpenstfRegressor):
 
     The PREOLE model is a robust tanh regression model to predict generated power according the wind force
     (and eventually other features). The first feature is considered as the wind force.
-    Data from under maintenance planst/turbines are filtered-out (low generated power with high wind force).
+    Data from under maintenance plants/turbines are filtered-out (low generated power with high wind force).
 
      See Also
     --------
-    TanhRegression : Class for tangent hyperbolic robust regression Models.
+    TanhOpenstfRegressor : Class for tangent hyperbolic robust regression Models.
     """
 
     def __init__(self, scale=1.0, max_iter=5):
@@ -176,6 +195,8 @@ class PREOLEOpenstfRegressor(TanhOpenstfRegressor):
         return {"requires_positive_X": True, "requires_positive_y": True}
 
     def fit(self, X, y, **kwargs):
+
+        # Check data positivity
         X, y = self._validate_data(X, y, y_numeric=True)
         check_non_negative(X[:, 0], "PREOLE (input first features X[:, 0])")
         check_non_negative(y, "PREOLE (output power y)")

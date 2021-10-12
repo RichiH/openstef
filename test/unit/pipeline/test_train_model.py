@@ -73,10 +73,9 @@ class TestTrainModelPipeline(BaseTestCase):
         """
         # Select 50 data points to speedup test
         train_input = self.train_input.iloc[::50, :]
+        print(train_input)
         for model_type in MLModelType:
             with self.subTest(model_type=model_type):
-                if model_type == MLModelType.PREOLE:
-                    self.skipTest("PREOLE model does not handle missing values.")
                 pj = self.pj
                 pj["model"] = model_type.value
                 # Use default parameters

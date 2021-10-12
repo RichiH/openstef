@@ -6,7 +6,7 @@ import sklearn
 from sklearn.utils.estimator_checks import check_estimator
 
 from openstf.model.regressors.sigmoid import (
-    TanhOpenstfRegressor,
+    SigmoidOpenstfRegressor,
     PREOLEOpenstfRegressor,
 )
 from test.utils import BaseTestCase, TestData
@@ -21,7 +21,7 @@ class TestPREOLEOpenstfRegressor(BaseTestCase):
         # Use sklearn build in check, this will raise an exception if some check fails
         # During these tests the fit and predict methods are elaborately tested
         # More info: https://scikit-learn.org/stable/modules/generated/sklearn.utils.estimator_checks.check_estimator.html
-        check_estimator(TanhOpenstfRegressor())
+        check_estimator(SigmoidOpenstfRegressor())
 
     def test_value_error_raised(self):
         model = PREOLEOpenstfRegressor()

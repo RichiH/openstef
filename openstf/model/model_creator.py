@@ -9,7 +9,10 @@ from openstf.enums import MLModelType
 from openstf.model.regressors.lgbm import LGBMOpenstfRegressor
 from openstf.model.regressors.xgb import XGBOpenstfRegressor
 from openstf.model.regressors.xgb_quantile import XGBQuantileOpenstfRegressor
-from openstf.model.regressors.sigmoid import PREOLEOpenstfRegressor
+from openstf.model.regressors.sigmoid import (
+    SigmoidOpenstfRegressor,
+    PREOLEOpenstfRegressor,
+)
 
 valid_model_kwargs = {
     MLModelType.XGB: [
@@ -71,10 +74,12 @@ valid_model_kwargs = {
         "min_child_weight",
         "max_depth",
     ],
-    MLModelType.PREOLE: [
+    MLModelType.SIGMOID: [
         "scale",
         "max_iter",
+        "lambda_thr" "init_intercept" "init_coef" "bounds",
     ],
+    MLModelType.PREOLE: ["scale", "max_iter", "lambda_thr"],
 }
 
 
@@ -86,6 +91,7 @@ class ModelCreator:
         MLModelType.XGB: XGBOpenstfRegressor,
         MLModelType.LGB: LGBMOpenstfRegressor,
         MLModelType.XGB_QUANTILE: XGBQuantileOpenstfRegressor,
+        MLModelType.SIGMOID: SigmoidOpenstfRegressor,
         MLModelType.PREOLE: PREOLEOpenstfRegressor,
     }
 

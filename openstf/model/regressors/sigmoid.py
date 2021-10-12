@@ -1,6 +1,8 @@
+from typing import Union
 import numpy as np
 import pandas as pd
 import numbers
+from sklearn.base import BaseEstimator, RegressorMixin
 
 from sklearn.utils.validation import check_non_negative, check_array, check_is_fitted
 from scipy.optimize import least_squares
@@ -8,7 +10,7 @@ from scipy.optimize import least_squares
 from openstf.model.regressors.regressor import OpenstfRegressor
 
 
-class TanhOpenstfRegressor(OpenstfRegressor):
+class SigmoidRobustRegressor(BaseEstimator, RegressorMixin):
     """Class for tangent hyperbolic robust regression Models,
 
     Similar to a perceptron with tanh as activation function.
@@ -26,9 +28,13 @@ class TanhOpenstfRegressor(OpenstfRegressor):
     max_iter: int, default=5
         The maximum number of iterations for the robusness mechanism.
 
+    lambda_thr: int, default=6
+        The multiplier of the threshold for outlier detection.
+        Data point for which residuals > lambda_thr * threshold are considered as outliers.
+
     Attributes
     ----------
-    init_params_: ndarray of shape (n_feature + 1,)
+    init_coef_: ndarray of shape (n_feature + 1,)
         Initial parameters for the first iteration of least squared optimization
 
     n_iter_: int
@@ -47,14 +53,24 @@ class TanhOpenstfRegressor(OpenstfRegressor):
         The absolute values of the coefficients.
     """
 
-    gain_importance_name = "total_gain"
-    weight_importance_name = "weight"
-
-    def __init__(self, scale=1.0, max_iter=5):
+    def __init__(
+        self,
+        scale=1.0,
+        max_iter=5,
+        lambda_thr=6,
+        init_intercept: float = 0,
+        init_coef: Union[float, np.array] = 0,
+        bounds=(-np.inf, np.inf),
+    ):
         self.scale = scale
         self.max_iter = max_iter
+        self.lambda_thr = lambda_thr
+        self.init_intercept = init_intercept
+        self.init_coef = init_coef
+        self.bounds = bounds
 
     def _more_tags(self):
+        # Poor score because of the robustness mechanism
         return {"requires_positive_y": True, "poor_score": True}
 
     @staticmethod
@@ -64,73 +80,67 @@ class TanhOpenstfRegressor(OpenstfRegressor):
         return scale * (np.tanh(a + x @ coef) - np.tanh(a)) / (1 - np.tanh(a) + 1e-15)
 
     @staticmethod
-    def _check_init_params(init_params, X, dtype=None, copy=False):
-        """Validate initial parameters for least squared based methods.
-        Note that passing init_params=None will output an array of zeros.
-        Therefore, in some cases, you may want to protect the call with:
-        if init_params is not None:
-            init_params = _check_init_params(...)
+    def _check_init_coef(init_coef, X, dtype=None, copy=False):
+        """Validate initial coefficient for least squared based methods.
 
         Parameters
         ----------
-        init_params : {ndarray, Number or None}, shape (n_samples,)
-           Input  initial parameters.
+        init_coef : {ndarray, Number}, shape (n_features,)
+           Input  initial coefficients.
         X : {ndarray, list, sparse matrix}
             Input data.
         dtype : dtype, default=None
-           dtype of the validated `init_params`.
-           If None, and the input `init_params` is an array, the dtype of the
+           dtype of the validated `init_coef`.
+           If None, and the input `init_coef` is an array, the dtype of the
            input is preserved; otherwise an array with the default numpy dtype
            is be allocated.  If `dtype` is not one of `float32`, `float64`,
            `None`, the output will be of dtype `float64`.
         copy : bool, default=False
-            If True, a copy of init_params will be created.
+            If True, a copy of init_coef will be created.
 
         Returns
         -------
-        init_params : ndarray of shape (n_samples,)
-           Validated initial parameters. It is guaranteed to be "C" contiguous.
+        init_coef : ndarray of shape (n_features,)
+           Validated initial coefficients. It is guaranteed to be "C" contiguous.
         """
-        n_samples = X.shape[1]
+        n_features = X.shape[1]
 
         if dtype is not None and dtype not in [np.float32, np.float64]:
             dtype = np.float64
 
-        if init_params is None:
-            init_params = np.zeros(n_samples + 1, dtype=dtype)
-        elif isinstance(init_params, numbers.Number):
-            init_params = np.full(n_samples + 1, init_params, dtype=dtype)
+        if isinstance(init_coef, numbers.Number):
+            init_coef = np.full(n_features, init_coef, dtype=dtype)
         else:
             if dtype is None:
                 dtype = [np.float64, np.float32]
-            init_params = check_array(
-                init_params,
+            init_coef = check_array(
+                init_coef,
                 accept_sparse=False,
                 ensure_2d=False,
                 dtype=dtype,
                 order="C",
                 copy=copy,
             )
-            if init_params.ndim != 1:
-                raise ValueError("Initial parameters must be 1D array or scalar")
+            if init_coef.ndim != 1:
+                raise ValueError("Initial coefficients must be 1D array or scalar")
 
-            if init_params.shape != (n_samples + 1,):
+            if init_coef.shape != (n_features,):
                 raise ValueError(
-                    "init_params.shape == {}, expected {}!".format(
-                        init_params.shape, (n_samples + 1,)
+                    "init_coef.shape == {}, but input data has {} features!".format(
+                        init_coef.shape, (n_features + 1,)
                     )
                 )
 
-        return init_params
+        return init_coef
 
-    def fit(self, X, y, init_params=None, bounds=(-np.inf, np.inf), **kwargs):
+    def fit(self, X, y, **kwargs):
 
         # Check data
         X, y = self._validate_data(X, y, y_numeric=True)
-        init_params = self._check_init_params(init_params, X)
+        init_coef = self._check_init_coef(self.init_coef, X, copy=True)
 
         # Initialization
-        p0 = init_params
+        p0 = np.concatenate([[self.init_intercept], init_coef])
         popt = p0 + 0.1
         indexes = np.arange(len(X))
 
@@ -142,7 +152,7 @@ class TanhOpenstfRegressor(OpenstfRegressor):
             res = least_squares(
                 lambda p: yi / self.scale - self._scaled_tanh(Xi, 1, p),
                 p0,
-                bounds=bounds,
+                bounds=self.bounds,
             )
 
             popt = res.x
@@ -157,10 +167,9 @@ class TanhOpenstfRegressor(OpenstfRegressor):
             yhat = self._scaled_tanh(X, self.scale, popt)
             residual = yhat - y
             threshold = np.median(np.abs(residual - np.median(residual)))
-            select = np.abs(residual) <= 6 * threshold
+            select = np.abs(residual) <= self.lambda_thr * threshold
             indexes = np.where(select)[0]
 
-        self.init_params_ = init_params
         self.n_iter_ = i
         self.intercept_ = popt[0]
         self.coef_ = popt[1:]
@@ -176,7 +185,7 @@ class TanhOpenstfRegressor(OpenstfRegressor):
         return self._scaled_tanh(X, self.scale, self.params_)
 
 
-class PREOLEOpenstfRegressor(TanhOpenstfRegressor):
+class PREOLE(SigmoidRobustRegressor):
     """Class for the PREOLE model, a forcast model for wind turbine plants,
 
     The PREOLE model is a robust tanh regression model to predict generated power according the wind force
@@ -185,11 +194,11 @@ class PREOLEOpenstfRegressor(TanhOpenstfRegressor):
 
      See Also
     --------
-    TanhOpenstfRegressor : Class for tangent hyperbolic robust regression Models.
+    SigmoidRobustRegressor : Class for tangent hyperbolic robust regression Models.
     """
 
-    def __init__(self, scale=1.0, max_iter=5):
-        super().__init__(scale, max_iter)
+    def __init__(self, scale=1.0, max_iter=5, lambda_thr=6):
+        super().__init__(scale, max_iter, lambda_thr, init_intercept=-2, init_coef=2)
 
     def _more_tags(self):
         return {"requires_positive_X": True, "requires_positive_y": True}
@@ -204,17 +213,19 @@ class PREOLEOpenstfRegressor(TanhOpenstfRegressor):
         # Filter under maintenance wind pannels
         select = (y >= 0.001) | (X[:, 0] <= 3)
 
-        # Bounds and init_params for LS solver
-        n_feat = X.shape[1]
-        bounds = (
-            [-10, 0] + (n_feat - 1) * [-np.inf],
-            [0, 10] + (n_feat - 1) * [+np.inf],
-        )
-        init_params = [-2.0, 2.0] + (n_feat - 1) * [0.0]
-
-        return super().fit(X[select], y[select], init_params=init_params, bounds=bounds)
+        return super().fit(X[select], y[select])
 
     def predict(self, X):
         X = self._validate_data(X)
         check_non_negative(X[:, 0], "PREOLE (input first features X[:, 0])")
         return super().predict(X)
+
+
+class SigmoidOpenstfRegressor(SigmoidRobustRegressor, OpenstfRegressor):
+    gain_importance_name = "total_gain"
+    weight_importance_name = "weight"
+
+
+class PREOLEOpenstfRegressor(PREOLE, OpenstfRegressor):
+    gain_importance_name = "total_gain"
+    weight_importance_name = "weight"

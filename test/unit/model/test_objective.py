@@ -12,6 +12,8 @@ from openstf.model.objective import (
     XGBRegressorObjective,
     LGBRegressorObjective,
     XGBQuantileRegressorObjective,
+    SigmoidRegressorObjective,
+    PREOLERegressorObjective,
 )
 from test.utils import BaseTestCase, TestData
 
@@ -103,6 +105,46 @@ class TestXGBQRegressorObjective(BaseTestCase):
         study.optimize(objective, n_trials=N_TRIALS)
 
         self.assertIsInstance(objective, XGBQuantileRegressorObjective)
+        self.assertEqual(len(study.trials), N_TRIALS)
+
+
+class TestSigmoidRegressorObjective(BaseTestCase):
+    def test_call(self):
+        model_type = "sigmoid"
+        model = ModelCreator.create_model(model_type)
+
+        objective = SigmoidRegressorObjective(
+            model,
+            input_data_with_features.dropna(),
+        )
+        study = optuna.create_study(
+            study_name=model_type,
+            pruner=optuna.pruners.MedianPruner(n_warmup_steps=5),
+            direction="minimize",
+        )
+        study.optimize(objective, n_trials=N_TRIALS)
+
+        self.assertIsInstance(objective, SigmoidRegressorObjective)
+        self.assertEqual(len(study.trials), N_TRIALS)
+
+
+class TestPREOLERegressorObjective(BaseTestCase):
+    def test_call(self):
+        model_type = "PREOLE"
+        model = ModelCreator.create_model(model_type)
+
+        objective = PREOLERegressorObjective(
+            model,
+            input_data_with_features.dropna().abs(),
+        )
+        study = optuna.create_study(
+            study_name=model_type,
+            pruner=optuna.pruners.MedianPruner(n_warmup_steps=5),
+            direction="minimize",
+        )
+        study.optimize(objective, n_trials=N_TRIALS)
+
+        self.assertIsInstance(objective, PREOLERegressorObjective)
         self.assertEqual(len(study.trials), N_TRIALS)
 
 

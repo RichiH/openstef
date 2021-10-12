@@ -248,3 +248,47 @@ class XGBQuantileRegressorObjective(RegressorObjective):
         return optuna.integration.XGBoostPruningCallback(
             trial, observation_key=f"validation_1-{self.eval_metric}"
         )
+
+
+class SigmoidRegressorObjective(RegressorObjective):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.model_type = MLModelType.SIGMOID
+
+    def get_params(self, trial: optuna.trial.FrozenTrial) -> dict:
+        """get parameters for Sigmoid Regressor Objective
+        with objective specific parameters.
+
+            Args: trial
+
+            Returns:
+                dict: {parameter: hyperparameter_value}
+        """
+
+        params = {
+            "max_iter": trial.suggest_int("max_iter", 3, 15),
+            "lambda_thr": trial.suggest_int("lambda_thr", 3, 10),
+        }
+        return params
+
+
+class PREOLERegressorObjective(RegressorObjective):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.model_type = MLModelType.PREOLE
+
+    def get_params(self, trial: optuna.trial.FrozenTrial) -> dict:
+        """get parameters for PREOLE Regressor Objective
+        with objective specific parameters.
+
+            Args: trial
+
+            Returns:
+                dict: {parameter: hyperparameter_value}
+        """
+
+        params = {
+            "max_iter": trial.suggest_int("max_iter", 3, 15),
+            "lambda_thr": trial.suggest_int("lambda_thr", 3, 10),
+        }
+        return params

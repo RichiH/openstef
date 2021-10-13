@@ -1,7 +1,8 @@
 from typing import Union
 import numpy as np
-import pandas as pd
 import numbers
+
+import pandas as pd
 from sklearn.base import BaseEstimator, RegressorMixin
 
 from sklearn.utils.validation import check_non_negative, check_array, check_is_fitted
@@ -176,6 +177,10 @@ class SigmoidRobustRegressor(BaseEstimator, RegressorMixin):
         self.params_ = popt
 
         self.feature_importance_ = np.abs(self.coef_)
+        if isinstance(X, pd.DataFrame):
+            self.feature_names_ = list(X.columns)
+        else:
+            self.feature_names_ = [f"X_{i + 1}" for i in range(X.shape[1])]
 
         return self
 
@@ -183,6 +188,10 @@ class SigmoidRobustRegressor(BaseEstimator, RegressorMixin):
         check_is_fitted(self)
         X = self._validate_data(X)
         return self._scaled_tanh(X, self.scale, self.params_)
+
+    @property
+    def feature_names(self):
+        return self.feature_names_
 
 
 class PREOLE(SigmoidRobustRegressor):

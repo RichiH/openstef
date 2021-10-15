@@ -77,9 +77,13 @@ valid_model_kwargs = {
     MLModelType.SIGMOID: [
         "scale",
         "max_iter",
-        "lambda_thr" "init_intercept" "init_coef" "bounds",
+        "lambda_thr",
+        "init_intercept",
+        "init_coef",
+        "bounds",
+        "imputation_strategy",
     ],
-    MLModelType.PREOLE: ["scale", "max_iter", "lambda_thr"],
+    MLModelType.PREOLE: ["scale", "max_iter", "lambda_thr", "imputation_strategy"],
 }
 
 

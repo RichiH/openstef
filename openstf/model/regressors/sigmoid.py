@@ -11,6 +11,7 @@ from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.utils.validation import check_non_negative, check_array, check_is_fitted
 from scipy.optimize import least_squares
 
+from openstf.model.metamodels.missing_values_handler import MissingValueHandler
 from openstf.model.regressors.regressor import OpenstfRegressor
 
 
@@ -179,11 +180,7 @@ class SigmoidRobustRegressor(BaseEstimator, RegressorMixin):
         self.coef_ = popt[1:]
         self.params_ = popt
 
-        self.feature_importance_ = np.abs(self.coef_)
-        if isinstance(X, pd.DataFrame):
-            self.feature_names_ = list(X.columns)
-        else:
-            self.feature_names_ = [f"X_{i + 1}" for i in range(X.shape[1])]
+        self.feature_importances_ = np.abs(self.coef_)
 
         return self
 
@@ -191,10 +188,6 @@ class SigmoidRobustRegressor(BaseEstimator, RegressorMixin):
         check_is_fitted(self)
         X = self._validate_data(X)
         return self._scaled_tanh(X, self.scale, self.params_)
-
-    @property
-    def feature_names(self):
-        return self.feature_names_
 
 
 class PREOLE(SigmoidRobustRegressor):
@@ -237,7 +230,91 @@ class SigmoidOpenstfRegressor(SigmoidRobustRegressor, OpenstfRegressor):
     gain_importance_name = "total_gain"
     weight_importance_name = "weight"
 
+    def __init__(
+        self,
+        scale=1.0,
+        max_iter=5,
+        lambda_thr=6,
+        init_intercept: float = 0,
+        init_coef: Union[float, np.array] = 0,
+        bounds=(-np.inf, np.inf),
+        imputation_strategy="mean",
+    ):
+        super().__init__(scale, max_iter, lambda_thr, init_intercept, init_coef, bounds)
+        self.imputation_strategy = imputation_strategy
+
+    def _more_tags(self):
+        return {"allow_nan": self.imputation_strategy is not None}
+
+    def fit(self, X, y, **kwargs):
+        self.estimator_ = MissingValueHandler(
+            SigmoidRobustRegressor(
+                self.scale,
+                self.max_iter,
+                self.lambda_thr,
+                self.init_intercept,
+                self.init_coef,
+                self.bounds,
+            ),
+            imputation_strategy=self.imputation_strategy,
+        )
+        self.estimator_.fit(X, y, **kwargs)
+        self.n_features_in_ = self.estimator_.n_features_in_
+        self.n_iter_ = self.estimator_.regressor_.n_iter_
+        self.n_features_in_ = self.estimator_.n_features_in_
+        self.feature_importances_ = self.estimator_.feature_importances_
+        return self
+
+    def predict(self, X):
+        check_is_fitted(self)
+        return self.estimator_.predict(X)
+
+    @property
+    def feature_names(self):
+        return self.feature_names_
+
 
 class PREOLEOpenstfRegressor(PREOLE, OpenstfRegressor):
     gain_importance_name = "total_gain"
     weight_importance_name = "weight"
+
+    def __init__(
+        self,
+        scale=1.0,
+        max_iter=5,
+        lambda_thr=6,
+        imputation_strategy="mean",
+    ):
+        super().__init__(
+            scale,
+            max_iter,
+            lambda_thr,
+        )
+        self.imputation_strategy = imputation_strategy
+
+    def _more_tags(self):
+        return {"allow_nan": self.imputation_strategy is not None}
+
+    def fit(self, X, y, **kwargs):
+        self.estimator_ = MissingValueHandler(
+            PREOLE(
+                self.scale,
+                self.max_iter,
+                self.lambda_thr,
+            ),
+            imputation_strategy=self.imputation_strategy,
+        )
+        self.estimator_.fit(X, y, **kwargs)
+        self.n_features_in_ = self.estimator_.n_features_in_
+        self.n_iter_ = self.estimator_.regressor_.n_iter_
+        self.feature_names_ = self.estimator_.feature_names_
+        self.feature_importances_ = self.estimator_.feature_importances_
+        return self
+
+    def predict(self, X):
+        check_is_fitted(self)
+        return self.estimator_.predict(X)
+
+    @property
+    def feature_names(self):
+        return self.feature_names_

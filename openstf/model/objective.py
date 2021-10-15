@@ -268,6 +268,9 @@ class SigmoidRegressorObjective(RegressorObjective):
         params = {
             "max_iter": trial.suggest_int("max_iter", 3, 15),
             "lambda_thr": trial.suggest_int("lambda_thr", 3, 10),
+            "imputation_strategy": trial.suggest_categorical(
+                "imputation_strategy", ["mean", "median", "most_frequent"]
+            ),
         }
         return params
 
@@ -290,5 +293,8 @@ class PREOLERegressorObjective(RegressorObjective):
         params = {
             "max_iter": trial.suggest_int("max_iter", 3, 15),
             "lambda_thr": trial.suggest_int("lambda_thr", 3, 10),
+            "imputation_strategy": trial.suggest_categorical(
+                "imputation_strategy", ["mean", "median", "most_frequent"]
+            ),
         }
         return params

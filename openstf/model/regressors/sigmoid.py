@@ -142,6 +142,7 @@ class SigmoidRobustRegressor(BaseEstimator, RegressorMixin):
 
         # Check data
         X, y = self._validate_data(X, y, y_numeric=True)
+        check_non_negative(y, "Sigmoid (output y)")
         init_coef = self._check_init_coef(self.init_coef, X, copy=True)
 
         # Initialization

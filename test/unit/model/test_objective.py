@@ -115,7 +115,7 @@ class TestSigmoidRegressorObjective(BaseTestCase):
 
         objective = SigmoidRegressorObjective(
             model,
-            input_data_with_features.dropna(),
+            input_data_with_features.dropna().abs(),
         )
         study = optuna.create_study(
             study_name=model_type,

@@ -6,7 +6,7 @@ import numpy as np
 import numbers
 
 import pandas as pd
-from sklearn.base import BaseEstimator, RegressorMixin
+from sklearn.base import BaseEstimator, MetaEstimatorMixin, RegressorMixin
 
 from sklearn.utils.validation import check_non_negative, check_array, check_is_fitted
 from scipy.optimize import least_squares
@@ -227,7 +227,7 @@ class PREOLE(SigmoidRobustRegressor):
         return super().predict(X)
 
 
-class SigmoidOpenstfRegressor(SigmoidRobustRegressor, OpenstfRegressor):
+class SigmoidOpenstfRegressor(MissingValueHandler, OpenstfRegressor):
     gain_importance_name = "total_gain"
     weight_importance_name = "weight"
 
@@ -239,43 +239,61 @@ class SigmoidOpenstfRegressor(SigmoidRobustRegressor, OpenstfRegressor):
         init_intercept: float = 0,
         init_coef: Union[float, np.array] = 0,
         bounds=(-np.inf, np.inf),
+        missing_value=np.nan,
         imputation_strategy="mean",
+        fill_value=0,
     ):
-        super().__init__(scale, max_iter, lambda_thr, init_intercept, init_coef, bounds)
+        super(SigmoidOpenstfRegressor, self).__init__(
+            SigmoidRobustRegressor(
+                scale, max_iter, lambda_thr, init_intercept, init_coef, bounds
+            ),
+            missing_values=missing_value,
+            imputation_strategy=imputation_strategy,
+            fill_value=fill_value,
+        )
+        self.scale = scale
+        self.max_iter = max_iter
+        self.lambda_thr = lambda_thr
+        self.init_intercept = init_intercept
+        self.init_coef = init_coef
+        self.bounds = bounds
+        self.missing_value = missing_value
         self.imputation_strategy = imputation_strategy
+        self.fill_value = fill_value
+
+    def set_params(self, **params):
+        if not params:
+            # Simple optimization to gain speed (inspect is slow)
+            return self
+        valid_params = self.get_params(deep=True)
+        valid_params_estimator = self.base_estimator.get_params(deep=True)
+        for key, value in params.items():
+            if key not in valid_params:
+                raise ValueError(
+                    "Invalid parameter %s for estimator %s. "
+                    "Check the list of available parameters "
+                    "with `estimator.get_params().keys()`." % (key, self)
+                )
+            setattr(self, key, value)
+            if key in valid_params_estimator:
+                setattr(self.base_estimator, key, value)
+
+        return self
+
+    def fit(self, X, y, **kwargs):
+        super().fit(X, y)
+        self.n_iter_ = self.regressor_.n_iter_
+        return self
 
     def _more_tags(self):
         return {"allow_nan": self.imputation_strategy is not None}
-
-    def fit(self, X, y, **kwargs):
-        self.estimator_ = MissingValueHandler(
-            SigmoidRobustRegressor(
-                self.scale,
-                self.max_iter,
-                self.lambda_thr,
-                self.init_intercept,
-                self.init_coef,
-                self.bounds,
-            ),
-            imputation_strategy=self.imputation_strategy,
-        )
-        self.estimator_.fit(X, y, **kwargs)
-        self.n_features_in_ = self.estimator_.n_features_in_
-        self.n_iter_ = self.estimator_.regressor_.n_iter_
-        self.n_features_in_ = self.estimator_.n_features_in_
-        self.feature_importances_ = self.estimator_.feature_importances_
-        return self
-
-    def predict(self, X):
-        check_is_fitted(self)
-        return self.estimator_.predict(X)
 
     @property
     def feature_names(self):
         return self.feature_names_
 
 
-class PREOLEOpenstfRegressor(PREOLE, OpenstfRegressor):
+class PREOLEOpenstfRegressor(SigmoidOpenstfRegressor, OpenstfRegressor):
     gain_importance_name = "total_gain"
     weight_importance_name = "weight"
 
@@ -284,38 +302,19 @@ class PREOLEOpenstfRegressor(PREOLE, OpenstfRegressor):
         scale=1.0,
         max_iter=5,
         lambda_thr=6,
+        missing_value=np.nan,
         imputation_strategy="mean",
+        fill_value=0,
     ):
-        super().__init__(
-            scale,
-            max_iter,
-            lambda_thr,
+        super(SigmoidOpenstfRegressor, self).__init__(
+            PREOLE(scale, max_iter, lambda_thr),
+            missing_values=missing_value,
+            imputation_strategy=imputation_strategy,
+            fill_value=fill_value,
         )
+        self.scale = scale
+        self.max_iter = max_iter
+        self.lambda_thr = lambda_thr
+        self.missing_value = missing_value
         self.imputation_strategy = imputation_strategy
-
-    def _more_tags(self):
-        return {"allow_nan": self.imputation_strategy is not None}
-
-    def fit(self, X, y, **kwargs):
-        self.estimator_ = MissingValueHandler(
-            PREOLE(
-                self.scale,
-                self.max_iter,
-                self.lambda_thr,
-            ),
-            imputation_strategy=self.imputation_strategy,
-        )
-        self.estimator_.fit(X, y, **kwargs)
-        self.n_features_in_ = self.estimator_.n_features_in_
-        self.n_iter_ = self.estimator_.regressor_.n_iter_
-        self.feature_names_ = self.estimator_.feature_names_
-        self.feature_importances_ = self.estimator_.feature_importances_
-        return self
-
-    def predict(self, X):
-        check_is_fitted(self)
-        return self.estimator_.predict(X)
-
-    @property
-    def feature_names(self):
-        return self.feature_names_
+        self.fill_value = fill_value

@@ -6,6 +6,7 @@ import unittest
 import numpy as np
 import pandas as pd
 import sklearn
+from sklearn.base import clone
 from sklearn.utils.estimator_checks import check_estimator
 
 from openstf.model.regressors.sigmoid import (
@@ -25,6 +26,16 @@ class TestPREOLEOpenstfRegressor(BaseTestCase):
         # During these tests the fit and predict methods are elaborately tested
         # More info: https://scikit-learn.org/stable/modules/generated/sklearn.utils.estimator_checks.check_estimator.html
         check_estimator(SigmoidOpenstfRegressor())
+
+    def test_set_params(self):
+        model = SigmoidOpenstfRegressor().set_params(scale=2)
+        self.assertEqual(model.scale, model.base_estimator.scale)
+
+        model2 = PREOLEOpenstfRegressor().set_params(scale=2)
+        self.assertEqual(model2.scale, model2.base_estimator.scale)
+
+        with self.assertRaises(ValueError):
+            model2.set_params(init_intercept=0)
 
     def test_value_error_raised(self):
         model = PREOLEOpenstfRegressor()

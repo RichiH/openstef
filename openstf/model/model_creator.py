@@ -81,9 +81,18 @@ valid_model_kwargs = {
         "init_intercept",
         "init_coef",
         "bounds",
+        "missing_value",
         "imputation_strategy",
+        "fill_value",
     ],
-    MLModelType.PREOLE: ["scale", "max_iter", "lambda_thr", "imputation_strategy"],
+    MLModelType.PREOLE: [
+        "scale",
+        "max_iter",
+        "lambda_thr",
+        "missing_value",
+        "imputation_strategy",
+        "fill_value",
+    ],
 }
 
 

@@ -32,6 +32,7 @@ from openstef.pipeline.train_model import train_model_pipeline
 from openstef.tasks.utils.predictionjobloop import PredictionJobLoop
 from openstef.tasks.utils.taskcontext import TaskContext
 
+
 TRAINING_PERIOD_DAYS: int = 120
 DEFAULT_CHECK_MODEL_AGE: bool = True
 
@@ -73,6 +74,8 @@ def train_model_task(
         datetime_end=datetime_end,
     )
 
+    default_modelspecs = pj["default_modelspecs"]
+
     context.perf_meter.checkpoint("Retrieved timeseries input")
 
     # Excecute the model training pipeline
@@ -81,6 +84,7 @@ def train_model_task(
         input_data,
         check_old_model_age=check_old_model_age,
         trained_models_folder=trained_models_folder,
+        default_modelspecs=default_modelspecs
     )
 
     context.perf_meter.checkpoint("Model trained")

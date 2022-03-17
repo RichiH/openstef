@@ -36,6 +36,7 @@ def train_model_pipeline(
     input_data: pd.DataFrame,
     check_old_model_age: bool,
     trained_models_folder: Union[str, Path],
+    default_modelspecs: ModelSpecificationDataClass=None
 ) -> None:
     """Midle level pipeline that takes care of all persistent storage dependencies
 
@@ -47,6 +48,7 @@ def train_model_pipeline(
         input_data (pd.DataFrame): Raw training input data
         check_old_model_age (bool): Check if training should be skipped because the model is too young
         trained_models_folder (Path): Path where trained models are stored
+        default_modelspecs (ModelSpecificationDataClass): Default model specifications
 
     Returns:
         None
@@ -66,7 +68,10 @@ def train_model_pipeline(
         old_model = None
         old_model_age = float("inf")
         # create basic modelspecs
-        modelspecs = ModelSpecificationDataClass(id=pj["id"])
+        if default_modelspecs is None:
+            modelspecs = ModelSpecificationDataClass(id=pj["id"])
+        else:
+            modelspecs = default_modelspecs
         logger.warning("No old model found, training new model", pid=pj["id"])
 
     # Check old model age and continue yes/no
@@ -144,6 +149,7 @@ def train_model_pipeline_core(
     model, report, train_data, validation_data, test_data = train_pipeline_common(
         pj, modelspecs, input_data, horizons
     )
+
     modelspecs.feature_names = list(train_data.columns)
 
     # Check if new model is better than old model

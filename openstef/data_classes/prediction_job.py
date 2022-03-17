@@ -2,9 +2,10 @@
 #
 # SPDX-License-Identifier: MPL-2.0
 
-from typing import Union, Optional, List
+from typing import Union, Optional, List, Callable
 
 from pydantic import BaseModel
+from .model_specifications import ModelSpecificationDataClass
 
 
 class PredictionJobDataClass(BaseModel):
@@ -19,6 +20,11 @@ class PredictionJobDataClass(BaseModel):
     name: str
     description: Optional[str]
     quantiles: Optional[List[float]]
+    train_horizons: Optional[List[int]]                       # Horizons used in the training phase
+    train_split_func: Optional[Union[Callable, str]]          # Function used to split data sets for the training phase.
+    default_modelspecs: Optional[ModelSpecificationDataClass] # Default specifications for the model.
+    depends_on: List[Union[int, str]] = []                    # List of prediction jobs the current job depends on.
+
 
     def __getitem__(self, item):
         """Allows us to use subscription to get the items from the object"""
